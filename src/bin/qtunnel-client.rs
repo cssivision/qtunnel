@@ -10,10 +10,8 @@ use tokio::net::{TcpListener, TcpStream};
 #[tokio::main]
 async fn main() -> io::Result<()> {
     env_logger::init();
-
     let config = parse_args("qtunnel-client").expect("invalid config");
     log::info!("{}", serde_json::to_string_pretty(&config).unwrap());
-
     let mut endpoint = quinn::Endpoint::builder();
     let mut client_config = quinn::ClientConfigBuilder::default();
     client_config.protocols(ALPN_QUIC_HTTP);
@@ -34,12 +32,10 @@ async fn main() -> io::Result<()> {
     let local_addr = config.local_addr.parse().expect("invalid remote addr");
     let new_conn = endpoint
         .connect(&local_addr, &config.domain_name)
-        .unwrap()
+        .map_err(|e| other(&format!("connect remote fail {:?}", e)))?
         .await
-        .unwrap();
-
+        .map_err(|e| other(&format!("new connection fail {:?}", e)))?;
     let new_conn = Arc::new(new_conn);
-
     let listener = TcpListener::bind(&config.local_addr).await?;
     loop {
         match listener.accept().await {
