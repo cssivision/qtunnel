@@ -1,2 +1,2 @@
 # qtunnel
-A tcp over quic + tls proxy.
+A tcp over quic proxy.
