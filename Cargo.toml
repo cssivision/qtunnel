@@ -6,3 +6,6 @@ edition = "2018"
 [dependencies]
 tokio = { version = "1.10", features = ["full"] }
 quinn = "0.7"
+log = "0.4"
+futures-util = { version = "0.3", default-features = false }
+env_logger = "0.8"
