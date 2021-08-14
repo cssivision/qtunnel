@@ -87,7 +87,7 @@ async fn proxy(conn: quinn::Connecting, addrs: Vec<SocketAddr>) -> io::Result<()
                         send_stream,
                         recv_stream,
                     };
-                    proxy_stream(stream, addr)
+                    proxy_stream(stream, addr).await
                 });
             }
         };
