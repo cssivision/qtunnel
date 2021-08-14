@@ -1,4 +1,3 @@
-use core::str;
 use std::io;
 
 use tokio::io::copy_bidirectional;
@@ -8,6 +7,7 @@ use stream::Stream;
 
 pub mod args;
 pub mod config;
+pub mod connection;
 pub mod stream;
 
 pub fn other(desc: &str) -> io::Error {

@@ -53,7 +53,7 @@ async fn main() -> io::Result<()> {
         let remote_addrs = remote_addrs.clone();
         tokio::spawn(async move {
             if let Err(e) = proxy(conn, remote_addrs).await {
-                log::error!("proxy h2 connection fail: {:?}", e);
+                log::error!("proxy connection fail: {:?}", e);
             }
         });
     }
@@ -70,10 +70,7 @@ async fn proxy(conn: quinn::Connecting, addrs: Vec<SocketAddr>) -> io::Result<()
 
     // Each stream initiated by the client constitutes a new request.
     while let Some(stream) = bi_streams.next().await {
-        next = next.wrapping_add(1);
-        let current = next % addrs.len();
-        let addr = addrs[current];
-
+        log::debug!("new stream incoming");
         match stream {
             Err(quinn::ConnectionError::ApplicationClosed { .. }) => {
                 return Err(other("connection closed"));
@@ -82,6 +79,9 @@ async fn proxy(conn: quinn::Connecting, addrs: Vec<SocketAddr>) -> io::Result<()
                 return Err(other(&format!("connection err: {:?}", e)));
             }
             Ok((send_stream, recv_stream)) => {
+                next = next.wrapping_add(1);
+                let current = next % addrs.len();
+                let addr = addrs[current];
                 tokio::spawn(async move {
                     let stream = Stream {
                         send_stream,
