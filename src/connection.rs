@@ -5,10 +5,12 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tokio::time::sleep;
+use tokio::time::timeout;
 
 use crate::stream::Stream;
+use crate::DEFAULT_CONNECT_TIMEOUT;
 
-use crate::{other, ALPN_QUIC_HTTP};
+use crate::{other, ALPN_QUIC_HTTP, DEFAULT_KEEP_ALIVE_INTERVAL, DEFAULT_MAX_IDLE_TIMEOUT};
 
 const DELAY_MS: &[u64] = &[50, 75, 100, 250, 500, 750, 1000];
 
@@ -73,7 +75,14 @@ impl Connection {
                 client_config
                     .add_certificate_authority(self.0.cert.clone())
                     .unwrap();
-                endpoint.default_client_config(client_config.build());
+                let mut client_config = client_config.build();
+                let mut transport_config = quinn::TransportConfig::default();
+                transport_config.keep_alive_interval(Some(DEFAULT_KEEP_ALIVE_INTERVAL));
+                transport_config
+                    .max_idle_timeout(Some(DEFAULT_MAX_IDLE_TIMEOUT))
+                    .map_err(|e| other(&format!("transport set max_idle_timeout fail {:?}", e)))?;
+                client_config.transport = Arc::new(transport_config);
+                endpoint.default_client_config(client_config);
                 let (endpoint, _) = endpoint
                     .bind(
                         &"127.0.0.1:0"
@@ -89,15 +98,20 @@ impl Connection {
                 new_conn
             };
 
-            match fut.await {
-                Ok(v) => return v,
+            match timeout(DEFAULT_CONNECT_TIMEOUT, fut).await {
+                Ok(v) => match v {
+                    Ok(v) => return v,
+                    Err(e) => {
+                        log::trace!("reconnect err: {:?} fail: {:?}", self.0.addr, e);
+                    }
+                },
                 Err(e) => {
-                    log::trace!("reconnect err: {:?} fail: {:?}", self.0.addr, e);
-                    let delay = DELAY_MS.get(sleeps as usize).unwrap_or(&1000);
-                    sleeps += 1;
-                    sleep(Duration::from_millis(*delay)).await;
+                    log::error!("connect remote timeout {}", e);
                 }
             }
+            let delay = DELAY_MS.get(sleeps as usize).unwrap_or(&1000);
+            sleeps += 1;
+            sleep(Duration::from_millis(*delay)).await;
         }
     }
 }

@@ -2,16 +2,16 @@ use std::fs;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
 
 use futures_util::StreamExt;
 use qtunnel::args::parse_args;
 use qtunnel::stream::Stream;
-use qtunnel::{other, ALPN_QUIC_HTTP};
+use qtunnel::{
+    other, ALPN_QUIC_HTTP, DEFAULT_CONNECT_TIMEOUT, DEFAULT_KEEP_ALIVE_INTERVAL,
+    DEFAULT_MAX_IDLE_TIMEOUT,
+};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
-
-pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -21,7 +21,10 @@ async fn main() -> io::Result<()> {
     log::info!("{}", serde_json::to_string_pretty(&cfg).unwrap());
 
     let mut transport_config = quinn::TransportConfig::default();
-    transport_config.max_concurrent_uni_streams(0).unwrap();
+    transport_config.keep_alive_interval(Some(DEFAULT_KEEP_ALIVE_INTERVAL));
+    transport_config
+        .max_idle_timeout(Some(DEFAULT_MAX_IDLE_TIMEOUT))
+        .map_err(|e| other(&format!("transport set max_idle_timeout fail {:?}", e)))?;
     let mut server_config = quinn::ServerConfig::default();
     server_config.transport = Arc::new(transport_config);
     let mut server_config = quinn::ServerConfigBuilder::new(server_config);
@@ -71,7 +74,6 @@ async fn proxy(conn: quinn::Connecting, addrs: Vec<SocketAddr>) -> io::Result<()
 
     // Each stream initiated by the client constitutes a new request.
     while let Some(stream) = bi_streams.next().await {
-        log::debug!("new stream incoming");
         match stream {
             Err(quinn::ConnectionError::ApplicationClosed { .. }) => {
                 return Err(other("connection closed"));
@@ -80,6 +82,7 @@ async fn proxy(conn: quinn::Connecting, addrs: Vec<SocketAddr>) -> io::Result<()
                 return Err(other(&format!("connection err: {:?}", e)));
             }
             Ok((send_stream, recv_stream)) => {
+                log::debug!("new stream incoming {}", send_stream.id());
                 next = next.wrapping_add(1);
                 let current = next % addrs.len();
                 let addr = addrs[current];
@@ -97,7 +100,7 @@ async fn proxy(conn: quinn::Connecting, addrs: Vec<SocketAddr>) -> io::Result<()
 }
 
 async fn proxy_stream(mut stream: Stream, addr: SocketAddr) {
-    match timeout(CONNECT_TIMEOUT, TcpStream::connect(addr)).await {
+    match timeout(DEFAULT_CONNECT_TIMEOUT, TcpStream::connect(addr)).await {
         Ok(conn) => {
             match conn {
                 Ok(conn) => {
