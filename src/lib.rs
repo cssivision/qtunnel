@@ -1,3 +1,4 @@
+use core::str;
 use std::io;
 
 use tokio::io::copy_bidirectional;
@@ -21,6 +22,7 @@ pub async fn proxy(mut socket: TcpStream, mut stream: Stream) {
             log::debug!("proxy local => remote: {}, remote => local: {}", n1, n2);
         }
         Err(e) => {
+            stream.reset();
             log::error!("copy_bidirectional err: {:?}", e);
         }
     }

@@ -6,9 +6,18 @@ use quinn::crypto::rustls::TlsSession;
 use quinn::generic::{RecvStream, SendStream};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
+const ERROR_CODE_RESET: u32 = 100;
+
 pub struct Stream {
     pub send_stream: SendStream<TlsSession>,
     pub recv_stream: RecvStream<TlsSession>,
+}
+
+impl Stream {
+    pub fn reset(&mut self) {
+        let _ = self.send_stream.reset(ERROR_CODE_RESET.into());
+        let _ = self.recv_stream.stop(ERROR_CODE_RESET.into());
+    }
 }
 
 impl AsyncRead for Stream {
