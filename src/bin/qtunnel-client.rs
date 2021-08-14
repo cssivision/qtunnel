@@ -1,10 +1,9 @@
 use std::fs;
 use std::io;
-use std::sync::Arc;
 
 use qtunnel::args::parse_args;
-use qtunnel::stream::Stream;
-use qtunnel::{other, ALPN_QUIC_HTTP};
+use qtunnel::connection::Connection;
+use qtunnel::other;
 use tokio::net::{TcpListener, TcpStream};
 
 #[tokio::main]
@@ -14,38 +13,20 @@ async fn main() -> io::Result<()> {
     let config = parse_args("qtunnel-client").expect("invalid config");
     log::info!("{}", serde_json::to_string_pretty(&config).unwrap());
 
-    let mut endpoint = quinn::Endpoint::builder();
-    let mut client_config = quinn::ClientConfigBuilder::default();
-    client_config.protocols(ALPN_QUIC_HTTP);
-    client_config
-        .add_certificate_authority(
-            quinn::Certificate::from_pem(&fs::read(config.ca_certificate).expect("read ca fail"))
-                .unwrap(),
-        )
-        .unwrap();
-    endpoint.default_client_config(client_config.build());
-    let (endpoint, _) = endpoint
-        .bind(
-            &"127.0.0.1:0"
-                .parse()
-                .map_err(|e| other(&format!("invalid bind addr {:?}", e)))?,
-        )
-        .map_err(|e| other(&format!("bind fail {:?}", e)))?;
     let remote_addr = config.remote_addr.parse().expect("invalid remote addr");
-    let new_conn = endpoint
-        .connect(&remote_addr, &config.domain_name)
-        .map_err(|e| other(&format!("connect remote fail {:?}", e)))?
-        .await
-        .map_err(|e| other(&format!("new connection fail {:?}", e)))?;
-    let new_conn = Arc::new(new_conn);
+    let cert = quinn::Certificate::from_pem(
+        &fs::read(&config.ca_certificate).map_err(|e| other(&format!("read ca fail {:?}", e)))?,
+    )
+    .map_err(|e| other(&format!("parse cert fail {:?}", e)))?;
+    let conn = Connection::new(cert, config.domain_name, remote_addr);
     let listener = TcpListener::bind(&config.local_addr).await?;
     loop {
         match listener.accept().await {
             Ok((stream, addr)) => {
                 log::debug!("accept tcp from {:?}", addr);
-                let new_conn = new_conn.clone();
+                let conn = conn.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = proxy(stream, new_conn).await {
+                    if let Err(e) = proxy(stream, conn).await {
                         log::error!("proxy error {:?}", e);
                     }
                 });
@@ -57,18 +38,9 @@ async fn main() -> io::Result<()> {
     }
 }
 
-async fn proxy(socket: TcpStream, new_conn: Arc<quinn::NewConnection>) -> io::Result<()> {
-    log::debug!("new stream");
-    let (send_stream, recv_stream) = new_conn
-        .connection
-        .open_bi()
-        .await
-        .map_err(|e| other(&e.to_string()))?;
-    log::debug!("proxy to {:?}", send_stream.id());
-    let stream = Stream {
-        send_stream,
-        recv_stream,
-    };
+async fn proxy(socket: TcpStream, conn: Connection) -> io::Result<()> {
+    let stream = conn.new_stream().await?;
+    log::debug!("proxy to {:?}", stream.send_stream.id());
     qtunnel::proxy(socket, stream).await;
     Ok(())
 }

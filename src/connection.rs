@@ -23,7 +23,7 @@ struct Inner {
 }
 
 impl Connection {
-    fn new(cert: quinn::Certificate, domain_name: String, addr: SocketAddr) -> Connection {
+    pub fn new(cert: quinn::Certificate, domain_name: String, addr: SocketAddr) -> Connection {
         Connection(Arc::new(Inner {
             addr,
             domain_name,
@@ -38,21 +38,29 @@ impl Connection {
             let _ = mem::replace(&mut *self.0.new_conn.lock().unwrap(), Some(new_conn));
         }
 
-        if let Some(new_conn) = self.0.new_conn.lock().unwrap().as_ref() {
-            match new_conn.connection.open_bi().await {
-                Ok((send_stream, recv_stream)) => {
-                    return Ok(Stream {
-                        send_stream,
-                        recv_stream,
-                    });
-                }
-                Err(e) => {
-                    log::error!("open bi fail {:?}", e);
-                    return Err(other(&format!("open bi stream fail {:?}", e)));
-                }
+        let open_bi = self
+            .0
+            .new_conn
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .connection
+            .open_bi();
+
+        match open_bi.await {
+            Ok((send_stream, recv_stream)) => {
+                return Ok(Stream {
+                    send_stream,
+                    recv_stream,
+                });
+            }
+            Err(e) => {
+                log::error!("open bi fail {:?}", e);
+                let _ = mem::replace(&mut *self.0.new_conn.lock().unwrap(), None);
+                return Err(other(&format!("open bi stream fail {:?}", e)));
             }
         }
-        unreachable!()
     }
 
     async fn connect(&self) -> quinn::NewConnection {

@@ -16,6 +16,7 @@ pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 #[tokio::main]
 async fn main() -> io::Result<()> {
     env_logger::init();
+
     let cfg = parse_args("qtunnel-server").expect("invalid config");
     log::info!("{}", serde_json::to_string_pretty(&cfg).unwrap());
 
