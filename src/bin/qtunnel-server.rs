@@ -8,7 +8,7 @@ use qtunnel::args::parse_args;
 use qtunnel::stream::Stream;
 use qtunnel::{
     other, ALPN_QUIC_HTTP, DEFAULT_CONNECT_TIMEOUT, DEFAULT_KEEP_ALIVE_INTERVAL,
-    DEFAULT_MAX_IDLE_TIMEOUT,
+    DEFAULT_MAX_CONCURRENT_BIDI_STREAMS, DEFAULT_MAX_IDLE_TIMEOUT,
 };
 use tokio::net::TcpStream;
 use tokio::time::timeout;
@@ -23,8 +23,17 @@ async fn main() -> io::Result<()> {
     let mut transport_config = quinn::TransportConfig::default();
     transport_config.keep_alive_interval(Some(DEFAULT_KEEP_ALIVE_INTERVAL));
     transport_config
+        .max_concurrent_bidi_streams(DEFAULT_MAX_CONCURRENT_BIDI_STREAMS)
+        .map_err(|e| {
+            other(&format!(
+                "transport set max_concurrent_bidi_streams fail {:?}",
+                e
+            ))
+        })?;
+    transport_config
         .max_idle_timeout(Some(DEFAULT_MAX_IDLE_TIMEOUT))
         .map_err(|e| other(&format!("transport set max_idle_timeout fail {:?}", e)))?;
+
     let mut server_config = quinn::ServerConfig::default();
     server_config.transport = Arc::new(transport_config);
     let mut server_config = quinn::ServerConfigBuilder::new(server_config);
