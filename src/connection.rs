@@ -85,7 +85,7 @@ impl Connection {
                 endpoint.default_client_config(client_config);
                 let (endpoint, _) = endpoint
                     .bind(
-                        &"127.0.0.1:0"
+                        &"[::]:0"
                             .parse()
                             .map_err(|e| other(&format!("invalid bind addr {:?}", e)))?,
                     )
