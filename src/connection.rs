@@ -51,16 +51,14 @@ impl Connection {
             .open_bi();
 
         match open_bi.await {
-            Ok((send_stream, recv_stream)) => {
-                return Ok(Stream {
-                    send_stream,
-                    recv_stream,
-                });
-            }
+            Ok((send_stream, recv_stream)) => Ok(Stream {
+                send_stream,
+                recv_stream,
+            }),
             Err(e) => {
                 log::error!("open bi fail {:?}", e);
                 let _ = mem::replace(&mut *self.0.new_conn.lock().unwrap(), None);
-                return Err(other(&format!("open bi stream fail {:?}", e)));
+                Err(other(&format!("open bi stream fail {:?}", e)))
             }
         }
     }
