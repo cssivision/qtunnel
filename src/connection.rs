@@ -1,6 +1,6 @@
 use std::io;
 use std::mem;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -82,11 +82,7 @@ impl Connection {
                 client_config.transport = Arc::new(transport_config);
                 endpoint.default_client_config(client_config);
                 let (endpoint, _) = endpoint
-                    .bind(
-                        &"0.0.0.0:0"
-                            .parse()
-                            .map_err(|e| other(&format!("invalid bind addr {:?}", e)))?,
-                    )
+                    .bind(&SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0))
                     .map_err(|e| other(&format!("bind fail {:?}", e)))?;
                 let new_conn = endpoint
                     .connect(&self.0.addr, &self.0.domain_name)
