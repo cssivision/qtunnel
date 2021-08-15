@@ -102,7 +102,7 @@ impl Connection {
                 Ok(v) => match v {
                     Ok(v) => return v,
                     Err(e) => {
-                        log::trace!("reconnect {:?} fail: {:?}", self.0.addr, e);
+                        log::error!("reconnect {:?} fail {:?}", self.0.addr, e);
                     }
                 },
                 Err(e) => {
