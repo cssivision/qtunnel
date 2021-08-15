@@ -8,9 +8,10 @@ use tokio::time::sleep;
 use tokio::time::timeout;
 
 use crate::stream::Stream;
-use crate::DEFAULT_CONNECT_TIMEOUT;
-
-use crate::{other, ALPN_QUIC_HTTP, DEFAULT_KEEP_ALIVE_INTERVAL, DEFAULT_MAX_IDLE_TIMEOUT};
+use crate::{
+    other, ALPN_QUIC_HTTP, DEFAULT_CONNECT_TIMEOUT, DEFAULT_KEEP_ALIVE_INTERVAL,
+    DEFAULT_MAX_IDLE_TIMEOUT,
+};
 
 const DELAY_MS: &[u64] = &[50, 75, 100, 250, 500, 750, 1000];
 
