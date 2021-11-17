@@ -4,12 +4,13 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use quinn::VarInt;
 use tokio::time::sleep;
 use tokio::time::timeout;
 
 use crate::stream::Stream;
 use crate::{
-    other, ALPN_QUIC_HTTP, DEFAULT_CONNECT_TIMEOUT, DEFAULT_KEEP_ALIVE_INTERVAL,
+    other, DEFAULT_CONNECT_TIMEOUT, DEFAULT_KEEP_ALIVE_INTERVAL,
     DEFAULT_MAX_CONCURRENT_BIDI_STREAMS, DEFAULT_MAX_IDLE_TIMEOUT,
 };
 
@@ -19,14 +20,14 @@ const DELAY_MS: &[u64] = &[50, 75, 100, 250, 500, 750, 1000];
 pub struct Connection(Arc<Inner>);
 
 struct Inner {
-    cert: quinn::Certificate,
+    cert: rustls::Certificate,
     addr: SocketAddr,
     domain_name: String,
     new_conn: Mutex<Option<quinn::NewConnection>>,
 }
 
 impl Connection {
-    pub fn new(cert: quinn::Certificate, domain_name: String, addr: SocketAddr) -> Connection {
+    pub fn new(cert: rustls::Certificate, domain_name: String, addr: SocketAddr) -> Connection {
         Connection(Arc::new(Inner {
             addr,
             domain_name,
@@ -68,34 +69,27 @@ impl Connection {
         let mut sleeps = 0;
         loop {
             let fut = async move {
-                let mut endpoint = quinn::Endpoint::builder();
-                let mut client_config = quinn::ClientConfigBuilder::default();
-                client_config.protocols(ALPN_QUIC_HTTP);
-                client_config
-                    .add_certificate_authority(self.0.cert.clone())
-                    .unwrap();
-                let mut client_config = client_config.build();
+                let mut certs = rustls::RootCertStore::empty();
+                certs
+                    .add(&self.0.cert)
+                    .map_err(|e| other(&format!("add cert fail {:?}", e)))?;
+                let mut client_config = quinn::ClientConfig::with_root_certificates(certs);
                 let mut transport_config = quinn::TransportConfig::default();
                 transport_config.keep_alive_interval(Some(DEFAULT_KEEP_ALIVE_INTERVAL));
                 transport_config
-                    .max_concurrent_bidi_streams(DEFAULT_MAX_CONCURRENT_BIDI_STREAMS)
-                    .map_err(|e| {
-                        other(&format!(
-                            "transport set max_concurrent_bidi_streams fail {:?}",
-                            e
-                        ))
-                    })?;
-                transport_config
-                    .max_idle_timeout(Some(DEFAULT_MAX_IDLE_TIMEOUT))
-                    .map_err(|e| other(&format!("transport set max_idle_timeout fail {:?}", e)))?;
-
+                    .max_concurrent_bidi_streams(VarInt::from_u32(
+                        DEFAULT_MAX_CONCURRENT_BIDI_STREAMS,
+                    ))
+                    .max_idle_timeout(Some(VarInt::from_u32(DEFAULT_MAX_IDLE_TIMEOUT).into()));
                 client_config.transport = Arc::new(transport_config);
-                endpoint.default_client_config(client_config);
-                let (endpoint, _) = endpoint
-                    .bind(&SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0))
-                    .map_err(|e| other(&format!("bind fail {:?}", e)))?;
+                let mut endpoint = quinn::Endpoint::client(SocketAddr::new(
+                    IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+                    0,
+                ))
+                .map_err(|e| other(&format!("bind fail {:?}", e)))?;
+                endpoint.set_default_client_config(client_config);
                 let new_conn = endpoint
-                    .connect(&self.0.addr, &self.0.domain_name)
+                    .connect(self.0.addr, &self.0.domain_name)
                     .map_err(|e| other(&format!("connect remote fail {:?}", e)))?
                     .await
                     .map_err(|e| other(&format!("new connection fail {:?}", e)));

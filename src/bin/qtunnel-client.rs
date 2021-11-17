@@ -1,9 +1,8 @@
-use std::fs;
 use std::io;
 
 use qtunnel::args::parse_args;
+use qtunnel::cert_from_pem;
 use qtunnel::connection::Connection;
-use qtunnel::other;
 use tokio::net::{TcpListener, TcpStream};
 
 #[tokio::main]
@@ -14,10 +13,7 @@ async fn main() -> io::Result<()> {
     log::info!("{}", serde_json::to_string_pretty(&config).unwrap());
 
     let remote_addr = config.remote_addr.parse().expect("invalid remote addr");
-    let cert = quinn::Certificate::from_pem(
-        &fs::read(&config.ca_certificate).map_err(|e| other(&format!("read ca fail {:?}", e)))?,
-    )
-    .map_err(|e| other(&format!("parse cert fail {:?}", e)))?;
+    let cert = cert_from_pem(&config.ca_certificate)?;
     let conn = Connection::new(cert, config.domain_name, remote_addr);
     let listener = TcpListener::bind(&config.local_addr).await?;
     loop {

@@ -2,15 +2,14 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use quinn::crypto::rustls::TlsSession;
-use quinn::generic::{RecvStream, SendStream};
+use quinn::{RecvStream, SendStream};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 const ERROR_CODE_RESET: u32 = 100;
 
 pub struct Stream {
-    pub send_stream: SendStream<TlsSession>,
-    pub recv_stream: RecvStream<TlsSession>,
+    pub send_stream: SendStream,
+    pub recv_stream: RecvStream,
 }
 
 impl Stream {

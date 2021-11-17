@@ -5,7 +5,7 @@ edition = "2018"
 
 [dependencies]
 tokio = { version = "1.10", features = ["full"] }
-quinn = "0.7"
+quinn = "0.8"
 log = "0.4"
 futures-util = { version = "0.3", default-features = false }
 env_logger = "0.8"
@@ -14,3 +14,5 @@ bytes = "1.0"
 getopts = "0.2"
 serde_derive = "1.0"
 serde_json = "1.0"
+rustls = "0.20"
+rustls-pemfile = "0.2"
