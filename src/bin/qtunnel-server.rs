@@ -58,7 +58,7 @@ async fn main() -> io::Result<()> {
 async fn proxy(conn: Connecting, addrs: Vec<SocketAddr>) -> io::Result<()> {
     let NewConnection { mut bi_streams, .. } = conn
         .await
-        .map_err(|e| other(&format!("bind local addr fail {:?}", e)))?;
+        .map_err(|e| other(&format!("new connection fail {:?}", e)))?;
     log::debug!("established");
 
     let mut next: usize = 0;

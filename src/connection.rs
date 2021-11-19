@@ -4,7 +4,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use quinn::VarInt;
+use quinn::{ClientConfig, Endpoint, NewConnection, TransportConfig, VarInt};
 use tokio::time::sleep;
 use tokio::time::timeout;
 
@@ -23,7 +23,7 @@ struct Inner {
     cert: rustls::Certificate,
     addr: SocketAddr,
     domain_name: String,
-    new_conn: Mutex<Option<quinn::NewConnection>>,
+    new_conn: Mutex<Option<NewConnection>>,
 }
 
 impl Connection {
@@ -65,7 +65,7 @@ impl Connection {
         }
     }
 
-    async fn connect(&self) -> quinn::NewConnection {
+    async fn connect(&self) -> NewConnection {
         let mut sleeps = 0;
         loop {
             let fut = async move {
@@ -73,8 +73,8 @@ impl Connection {
                 certs
                     .add(&self.0.cert)
                     .map_err(|e| other(&format!("add cert fail {:?}", e)))?;
-                let mut client_config = quinn::ClientConfig::with_root_certificates(certs);
-                let mut transport_config = quinn::TransportConfig::default();
+                let mut client_config = ClientConfig::with_root_certificates(certs);
+                let mut transport_config = TransportConfig::default();
                 transport_config.keep_alive_interval(Some(DEFAULT_KEEP_ALIVE_INTERVAL));
                 transport_config
                     .max_concurrent_bidi_streams(VarInt::from_u32(
@@ -82,11 +82,9 @@ impl Connection {
                     ))
                     .max_idle_timeout(Some(VarInt::from_u32(DEFAULT_MAX_IDLE_TIMEOUT).into()));
                 client_config.transport = Arc::new(transport_config);
-                let mut endpoint = quinn::Endpoint::client(SocketAddr::new(
-                    IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
-                    0,
-                ))
-                .map_err(|e| other(&format!("bind fail {:?}", e)))?;
+                let mut endpoint =
+                    Endpoint::client(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0))
+                        .map_err(|e| other(&format!("bind fail {:?}", e)))?;
                 endpoint.set_default_client_config(client_config);
                 let new_conn = endpoint
                     .connect(self.0.addr, &self.0.domain_name)
