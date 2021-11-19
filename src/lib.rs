@@ -43,7 +43,6 @@ pub fn other(desc: &str) -> io::Error {
     io::Error::new(io::ErrorKind::Other, desc)
 }
 
-pub const ALPN_QUIC_HTTP: &[&[u8]] = &[b"hq-29"];
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 pub const DEFAULT_KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(10);
 pub const DEFAULT_MAX_IDLE_TIMEOUT: u32 = 30_000;
