@@ -35,19 +35,22 @@ impl Config {
         Err(other(&format!("{:?} not exist", path.as_ref().to_str())))
     }
 
-    pub fn remote_socket_addrs(&self) -> Vec<SocketAddr> {
+    pub fn remote_socket_addrs(&self) -> Vec<Addr> {
         self.remote_addr
             .split(',')
-            .map(|v| v.parse())
-            .filter(|v| {
-                if let Err(e) = v {
-                    log::error!("invalid addr: {}", e);
-                    false
+            .filter_map(|v| {
+                if let Ok(addr) = v.parse() {
+                    Some(Addr::Socket(addr))
                 } else {
-                    true
+                    Some(Addr::Unix(v.to_string()))
                 }
             })
-            .map(|v| v.unwrap())
             .collect()
     }
+}
+
+#[derive(Clone)]
+pub enum Addr {
+    Socket(SocketAddr),
+    Unix(String),
 }

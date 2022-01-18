@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use futures_util::StreamExt;
 use qtunnel::args::parse_args;
+use qtunnel::config::Addr;
 use qtunnel::stream::Stream;
 use qtunnel::{
     cert_from_pem, other, private_key_from_pem, DEFAULT_CONNECT_TIMEOUT,
@@ -12,7 +13,7 @@ use qtunnel::{
 use quinn::{
     Connecting, ConnectionError, Endpoint, NewConnection, ServerConfig, TransportConfig, VarInt,
 };
-use tokio::net::TcpStream;
+use tokio::net::{TcpStream, UnixStream};
 use tokio::time::timeout;
 
 #[tokio::main]
@@ -55,7 +56,7 @@ async fn main() -> io::Result<()> {
     Ok(())
 }
 
-async fn proxy(conn: Connecting, addrs: Vec<SocketAddr>) -> io::Result<()> {
+async fn proxy(conn: Connecting, addrs: Vec<Addr>) -> io::Result<()> {
     let NewConnection { mut bi_streams, .. } = conn
         .await
         .map_err(|e| other(&format!("new connection fail {:?}", e)))?;
@@ -76,18 +77,40 @@ async fn proxy(conn: Connecting, addrs: Vec<SocketAddr>) -> io::Result<()> {
                 log::debug!("new stream incoming {}", send_stream.id());
                 next = next.wrapping_add(1);
                 let current = next % addrs.len();
-                let addr = addrs[current];
+                let addr = addrs[current].clone();
                 tokio::spawn(async move {
                     let stream = Stream {
                         send_stream,
                         recv_stream,
                     };
-                    proxy_stream(stream, addr).await
+                    match addr {
+                        Addr::Socket(addr) => proxy_stream(stream, addr).await,
+                        Addr::Unix(addr) => proxy_unix(stream, &addr).await,
+                    }
                 });
             }
         };
     }
     Ok(())
+}
+
+async fn proxy_unix(mut stream: Stream, addr: &str) {
+    match timeout(DEFAULT_CONNECT_TIMEOUT, UnixStream::connect(addr)).await {
+        Ok(conn) => {
+            match conn {
+                Ok(mut conn) => {
+                    qtunnel::proxy(&mut conn, stream).await;
+                }
+                Err(e) => {
+                    log::error!("connect to {} err {:?}", &addr, e);
+                }
+            };
+        }
+        Err(e) => {
+            stream.reset();
+            log::error!("connect to {} err {:?}", &addr, e);
+        }
+    }
 }
 
 async fn proxy_stream(mut stream: Stream, addr: SocketAddr) {
