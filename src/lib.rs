@@ -3,8 +3,7 @@ use std::io;
 use std::time::Duration;
 
 use rustls::{Certificate, PrivateKey};
-use tokio::io::copy_bidirectional;
-use tokio::net::TcpStream;
+use tokio::io::{copy_bidirectional, AsyncRead, AsyncWrite};
 
 use stream::Stream;
 
@@ -48,8 +47,11 @@ pub const DEFAULT_KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(10);
 pub const DEFAULT_MAX_IDLE_TIMEOUT: u32 = 30_000;
 pub const DEFAULT_MAX_CONCURRENT_BIDI_STREAMS: u32 = 2048;
 
-pub async fn proxy(mut socket: TcpStream, mut stream: Stream) {
-    match copy_bidirectional(&mut socket, &mut stream).await {
+pub async fn proxy<A>(socket: &mut A, mut stream: Stream)
+where
+    A: AsyncRead + AsyncWrite + Unpin + ?Sized,
+{
+    match copy_bidirectional(socket, &mut stream).await {
         Ok((n1, n2)) => {
             log::debug!("proxy local => remote: {}, remote => local: {}", n1, n2);
         }

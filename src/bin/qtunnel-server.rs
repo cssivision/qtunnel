@@ -94,8 +94,8 @@ async fn proxy_stream(mut stream: Stream, addr: SocketAddr) {
     match timeout(DEFAULT_CONNECT_TIMEOUT, TcpStream::connect(addr)).await {
         Ok(conn) => {
             match conn {
-                Ok(conn) => {
-                    qtunnel::proxy(conn, stream).await;
+                Ok(mut conn) => {
+                    qtunnel::proxy(&mut conn, stream).await;
                 }
                 Err(e) => {
                     log::error!("connect to {} err {:?}", &addr, e);

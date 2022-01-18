@@ -18,11 +18,11 @@ async fn main() -> io::Result<()> {
     let listener = TcpListener::bind(&config.local_addr).await?;
     loop {
         match listener.accept().await {
-            Ok((stream, addr)) => {
+            Ok((mut stream, addr)) => {
                 log::debug!("accept tcp from {:?}", addr);
                 let conn = conn.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = proxy(stream, conn).await {
+                    if let Err(e) = proxy(&mut stream, conn).await {
                         log::error!("proxy error {:?}", e);
                     }
                 });
@@ -34,7 +34,7 @@ async fn main() -> io::Result<()> {
     }
 }
 
-async fn proxy(socket: TcpStream, conn: Connection) -> io::Result<()> {
+async fn proxy(socket: &mut TcpStream, conn: Connection) -> io::Result<()> {
     let stream = conn.new_stream().await?;
     log::debug!("proxy to {:?}", stream.send_stream.id());
     qtunnel::proxy(socket, stream).await;
