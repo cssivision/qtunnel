@@ -1,12 +1,12 @@
 use std::io;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
-use quinn::{ClientConfig, Endpoint, NewConnection, TransportConfig, VarInt};
-use tokio::time::sleep;
-use tokio::time::timeout;
+use quinn::{ClientConfig, Endpoint, NewConnection, OpenBi, TransportConfig, VarInt};
+use tokio::sync::Mutex;
+use tokio::time::{sleep, timeout};
 
 use crate::stream::Stream;
 use crate::{
@@ -36,21 +36,17 @@ impl Connection {
         }))
     }
 
-    pub async fn new_stream(&self) -> io::Result<Stream> {
-        if self.0.new_conn.lock().unwrap().is_none() {
+    async fn open_bi(&self) -> OpenBi {
+        let mut lock = self.0.new_conn.lock().await;
+        if lock.is_none() {
             let new_conn = self.connect().await;
-            let _ = mem::replace(&mut *self.0.new_conn.lock().unwrap(), Some(new_conn));
+            let _ = mem::replace(&mut *lock, Some(new_conn));
         }
+        lock.as_ref().unwrap().connection.open_bi()
+    }
 
-        let open_bi = self
-            .0
-            .new_conn
-            .lock()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .connection
-            .open_bi();
+    pub async fn new_stream(&self) -> io::Result<Stream> {
+        let open_bi = self.open_bi().await;
 
         match open_bi.await {
             Ok((send_stream, recv_stream)) => Ok(Stream {
@@ -59,7 +55,7 @@ impl Connection {
             }),
             Err(e) => {
                 log::error!("open bi fail {:?}", e);
-                let _ = mem::replace(&mut *self.0.new_conn.lock().unwrap(), None);
+                let _ = mem::replace(&mut *self.0.new_conn.lock().await, None);
                 Err(other(&format!("open bi stream fail {:?}", e)))
             }
         }

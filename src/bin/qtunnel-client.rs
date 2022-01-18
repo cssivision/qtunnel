@@ -17,20 +17,14 @@ async fn main() -> io::Result<()> {
     let conn = Connection::new(cert, config.domain_name, remote_addr);
     let listener = TcpListener::bind(&config.local_addr).await?;
     loop {
-        match listener.accept().await {
-            Ok((mut stream, addr)) => {
-                log::debug!("accept tcp from {:?}", addr);
-                let conn = conn.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = proxy(&mut stream, conn).await {
-                        log::error!("proxy error {:?}", e);
-                    }
-                });
+        let (mut stream, addr) = listener.accept().await?;
+        log::debug!("accept tcp from {:?}", addr);
+        let conn = conn.clone();
+        tokio::spawn(async move {
+            if let Err(e) = proxy(&mut stream, conn).await {
+                log::error!("proxy error {:?}", e);
             }
-            Err(e) => {
-                log::error!("accept fail: {:?}", e);
-            }
-        }
+        });
     }
 }
 
