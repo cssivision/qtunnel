@@ -1,5 +1,6 @@
 use std::io;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use futures_util::StreamExt;
@@ -85,7 +86,7 @@ async fn proxy(conn: Connecting, addrs: Vec<Addr>) -> io::Result<()> {
                     };
                     match addr {
                         Addr::Socket(addr) => proxy_stream(stream, addr).await,
-                        Addr::Unix(addr) => proxy_unix(stream, &addr).await,
+                        Addr::Path(addr) => proxy_unix(stream, addr).await,
                     }
                 });
             }
@@ -94,21 +95,21 @@ async fn proxy(conn: Connecting, addrs: Vec<Addr>) -> io::Result<()> {
     Ok(())
 }
 
-async fn proxy_unix(mut stream: Stream, addr: &str) {
-    match timeout(DEFAULT_CONNECT_TIMEOUT, UnixStream::connect(addr)).await {
+async fn proxy_unix(mut stream: Stream, addr: PathBuf) {
+    match timeout(DEFAULT_CONNECT_TIMEOUT, UnixStream::connect(&addr)).await {
         Ok(conn) => {
             match conn {
                 Ok(mut conn) => {
                     qtunnel::proxy(&mut conn, stream).await;
                 }
                 Err(e) => {
-                    log::error!("connect to {} err {:?}", &addr, e);
+                    log::error!("connect to {:?} err {:?}", addr, e);
                 }
             };
         }
         Err(e) => {
             stream.reset();
-            log::error!("connect to {} err {:?}", &addr, e);
+            log::error!("connect to {:?} err {:?}", addr, e);
         }
     }
 }

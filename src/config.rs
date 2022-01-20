@@ -1,7 +1,7 @@
 use std::fs;
 use std::io;
 use std::net::SocketAddr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_derive::{Deserialize, Serialize};
 
@@ -42,7 +42,7 @@ impl Config {
                 if let Ok(addr) = v.parse() {
                     Some(Addr::Socket(addr))
                 } else {
-                    Some(Addr::Unix(v.to_string()))
+                    Some(Addr::Path(Path::new(v).to_path_buf()))
                 }
             })
             .collect()
@@ -52,5 +52,5 @@ impl Config {
 #[derive(Clone)]
 pub enum Addr {
     Socket(SocketAddr),
-    Unix(String),
+    Path(PathBuf),
 }
