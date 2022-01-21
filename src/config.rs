@@ -38,11 +38,11 @@ impl Config {
     pub fn remote_socket_addrs(&self) -> Vec<Addr> {
         self.remote_addr
             .split(',')
-            .filter_map(|v| {
+            .map(|v| {
                 if let Ok(addr) = v.parse() {
-                    Some(Addr::Socket(addr))
+                    Addr::Socket(addr)
                 } else {
-                    Some(Addr::Path(Path::new(v).to_path_buf()))
+                    Addr::Path(Path::new(v).to_path_buf())
                 }
             })
             .collect()
