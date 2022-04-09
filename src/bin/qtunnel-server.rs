@@ -12,7 +12,8 @@ use qtunnel::{
     DEFAULT_KEEP_ALIVE_INTERVAL, DEFAULT_MAX_CONCURRENT_BIDI_STREAMS, DEFAULT_MAX_IDLE_TIMEOUT,
 };
 use quinn::{
-    Connecting, ConnectionError, Endpoint, NewConnection, ServerConfig, TransportConfig, VarInt,
+    congestion, Connecting, ConnectionError, Endpoint, NewConnection, ServerConfig,
+    TransportConfig, VarInt,
 };
 use tokio::net::{TcpStream, UnixStream};
 use tokio::time::timeout;
@@ -32,7 +33,9 @@ async fn main() -> io::Result<()> {
     transport_config.keep_alive_interval(Some(DEFAULT_KEEP_ALIVE_INTERVAL));
     transport_config
         .max_concurrent_bidi_streams(VarInt::from_u32(DEFAULT_MAX_CONCURRENT_BIDI_STREAMS))
-        .max_idle_timeout(Some(VarInt::from_u32(DEFAULT_MAX_IDLE_TIMEOUT).into()));
+        .max_idle_timeout(Some(VarInt::from_u32(DEFAULT_MAX_IDLE_TIMEOUT).into()))
+        .congestion_controller_factory(Arc::new(congestion::BbrConfig::default()));
+
     let mut server_config = ServerConfig::with_single_cert(cert_chain, key)
         .map_err(|e| other(&format!("new server config fail {:?}", e)))?;
     server_config.transport = Arc::new(transport_config);

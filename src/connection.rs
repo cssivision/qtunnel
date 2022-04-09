@@ -4,7 +4,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
-use quinn::{ClientConfig, Endpoint, NewConnection, OpenBi, TransportConfig, VarInt};
+use quinn::{congestion, ClientConfig, Endpoint, NewConnection, OpenBi, TransportConfig, VarInt};
 use tokio::sync::Mutex;
 use tokio::time::{sleep, timeout};
 
@@ -76,7 +76,8 @@ impl Connection {
                     .max_concurrent_bidi_streams(VarInt::from_u32(
                         DEFAULT_MAX_CONCURRENT_BIDI_STREAMS,
                     ))
-                    .max_idle_timeout(Some(VarInt::from_u32(DEFAULT_MAX_IDLE_TIMEOUT).into()));
+                    .max_idle_timeout(Some(VarInt::from_u32(DEFAULT_MAX_IDLE_TIMEOUT).into()))
+                    .congestion_controller_factory(Arc::new(congestion::BbrConfig::default()));
                 client_config.transport = Arc::new(transport_config);
                 let mut endpoint =
                     Endpoint::client(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0))
