@@ -8,8 +8,10 @@ use tokio::io::{copy_bidirectional, AsyncRead, AsyncWrite};
 use stream::Stream;
 
 pub mod args;
+pub mod client;
 pub mod config;
 pub mod connection;
+pub mod server;
 pub mod stream;
 
 pub fn private_key_from_pem(server_key: &str) -> io::Result<PrivateKey> {

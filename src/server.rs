@@ -4,13 +4,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use futures_util::StreamExt;
-use qtunnel::args::parse_args;
-use qtunnel::config::Addr;
-use qtunnel::stream::Stream;
-use qtunnel::{
-    cert_from_pem, other, private_key_from_pem, DEFAULT_CONNECT_TIMEOUT,
-    DEFAULT_KEEP_ALIVE_INTERVAL, DEFAULT_MAX_CONCURRENT_BIDI_STREAMS, DEFAULT_MAX_IDLE_TIMEOUT,
-};
 use quinn::{
     congestion, Connecting, ConnectionError, Endpoint, NewConnection, ServerConfig,
     TransportConfig, VarInt,
@@ -18,13 +11,14 @@ use quinn::{
 use tokio::net::{TcpStream, UnixStream};
 use tokio::time::timeout;
 
-#[tokio::main]
-async fn main() -> io::Result<()> {
-    env_logger::init();
+use crate::config::{self, Addr};
+use crate::stream::Stream;
+use crate::{
+    cert_from_pem, other, private_key_from_pem, DEFAULT_CONNECT_TIMEOUT,
+    DEFAULT_KEEP_ALIVE_INTERVAL, DEFAULT_MAX_CONCURRENT_BIDI_STREAMS, DEFAULT_MAX_IDLE_TIMEOUT,
+};
 
-    let cfg = parse_args("qtunnel-server").expect("invalid config");
-    log::info!("{}", serde_json::to_string_pretty(&cfg).unwrap());
-
+pub async fn run(cfg: config::Server) -> io::Result<()> {
     let key = private_key_from_pem(&cfg.server_key)?;
     let cert = cert_from_pem(&cfg.server_cert)?;
     let cert_chain = vec![cert];
@@ -103,7 +97,7 @@ async fn proxy_unix(mut stream: Stream, addr: PathBuf) {
         Ok(conn) => {
             match conn {
                 Ok(mut conn) => {
-                    qtunnel::proxy(&mut conn, stream).await;
+                    crate::proxy(&mut conn, stream).await;
                 }
                 Err(e) => {
                     log::error!("connect to {:?} err {:?}", addr, e);
@@ -122,7 +116,7 @@ async fn proxy_stream(mut stream: Stream, addr: SocketAddr) {
         Ok(conn) => {
             match conn {
                 Ok(mut conn) => {
-                    qtunnel::proxy(&mut conn, stream).await;
+                    crate::proxy(&mut conn, stream).await;
                 }
                 Err(e) => {
                     log::error!("connect to {} err {:?}", &addr, e);

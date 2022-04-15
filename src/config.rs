@@ -10,31 +10,21 @@ use crate::other;
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct Config {
-    pub local_addr: String,
-    pub remote_addr: String,
-    pub domain_name: String,
-    pub ca_certificate: String,
-    pub server_cert: String,
-    pub server_key: String,
+    pub client: Option<Client>,
+    pub server: Option<Server>,
 }
 
-impl Config {
-    pub fn new<P: AsRef<Path>>(path: P) -> io::Result<Config> {
-        if path.as_ref().exists() {
-            let contents = fs::read_to_string(path)?;
-            let config = match serde_json::from_str(&contents) {
-                Ok(c) => c,
-                Err(e) => {
-                    log::error!("{}", e);
-                    return Err(io::Error::new(io::ErrorKind::Other, e));
-                }
-            };
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(default)]
+pub struct Server {
+    pub local_addr: String,
+    pub remote_addr: String,
+    pub server_cert: String,
+    pub server_key: String,
+    pub congestion_controller: String,
+}
 
-            return Ok(config);
-        }
-        Err(other(&format!("{:?} not exist", path.as_ref().to_str())))
-    }
-
+impl Server {
     pub fn remote_socket_addrs(&self) -> Vec<Addr> {
         self.remote_addr
             .split(',')
@@ -46,6 +36,39 @@ impl Config {
                 }
             })
             .collect()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(default)]
+pub struct Client {
+    pub local_addr: String,
+    pub remote_addr: String,
+    pub domain_name: String,
+    pub ca_certificate: String,
+    pub congestion_controller: String,
+}
+
+impl Config {
+    pub fn new<P: AsRef<Path>>(path: P) -> io::Result<Config> {
+        if path.as_ref().exists() {
+            let contents = fs::read_to_string(path)?;
+            let config: Config = match toml::from_str(&contents) {
+                Ok(c) => c,
+                Err(e) => {
+                    log::error!("{}", e);
+                    return Err(io::Error::new(io::ErrorKind::Other, e));
+                }
+            };
+            if config.client.is_none() && config.server.is_none() {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "client or server required",
+                ));
+            }
+            return Ok(config);
+        }
+        Err(other(&format!("{:?} not exist", path.as_ref().to_str())))
     }
 }
 
