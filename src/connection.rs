@@ -8,6 +8,7 @@ use quinn::{congestion, ClientConfig, Endpoint, NewConnection, OpenBi, Transport
 use tokio::sync::Mutex;
 use tokio::time::{sleep, timeout};
 
+use crate::config::CongestionController;
 use crate::stream::Stream;
 use crate::{
     other, DEFAULT_CONNECT_TIMEOUT, DEFAULT_KEEP_ALIVE_INTERVAL,
@@ -24,15 +25,22 @@ struct Inner {
     addr: SocketAddr,
     domain_name: String,
     new_conn: Mutex<Option<NewConnection>>,
+    congestion_controller: CongestionController,
 }
 
 impl Connection {
-    pub fn new(cert: rustls::Certificate, domain_name: String, addr: SocketAddr) -> Connection {
+    pub fn new(
+        cert: rustls::Certificate,
+        domain_name: String,
+        addr: SocketAddr,
+        cc: CongestionController,
+    ) -> Connection {
         Connection(Arc::new(Inner {
             addr,
             domain_name,
             cert,
             new_conn: Mutex::new(None),
+            congestion_controller: cc,
         }))
     }
 
@@ -76,8 +84,25 @@ impl Connection {
                     .max_concurrent_bidi_streams(VarInt::from_u32(
                         DEFAULT_MAX_CONCURRENT_BIDI_STREAMS,
                     ))
-                    .max_idle_timeout(Some(VarInt::from_u32(DEFAULT_MAX_IDLE_TIMEOUT).into()))
-                    .congestion_controller_factory(Arc::new(congestion::BbrConfig::default()));
+                    .max_idle_timeout(Some(VarInt::from_u32(DEFAULT_MAX_IDLE_TIMEOUT).into()));
+
+                match self.0.congestion_controller {
+                    CongestionController::Bbr => {
+                        transport_config.congestion_controller_factory(Arc::new(
+                            congestion::BbrConfig::default(),
+                        ));
+                    }
+                    CongestionController::NewReno => {
+                        transport_config.congestion_controller_factory(Arc::new(
+                            congestion::NewRenoConfig::default(),
+                        ));
+                    }
+                    CongestionController::Cubic => {
+                        transport_config.congestion_controller_factory(Arc::new(
+                            congestion::CubicConfig::default(),
+                        ));
+                    }
+                }
                 client_config.transport = Arc::new(transport_config);
                 let mut endpoint =
                     Endpoint::client(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0))

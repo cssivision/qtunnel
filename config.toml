@@ -3,11 +3,11 @@ local_addr = '127.0.0.1:8090'
 remote_addr = '127.0.0.1:8091'
 domain_name = 'mydomain.com'
 ca_certificate = './tls_config/rootCA.crt'
-congestion_controller = 'bbr'
+congestion_controller = 'Bbr'
 
 [server]
 local_addr = "127.0.0.1:8091"
 remote_addr = "127.0.0.1:8092"
 server_cert = "./tls_config/mydomain.com.crt"
 server_key = "./tls_config/mydomain.com.key"
-congestion_controller = "bbr"
+congestion_controller = "Bbr"

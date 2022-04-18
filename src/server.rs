@@ -11,7 +11,7 @@ use quinn::{
 use tokio::net::{TcpStream, UnixStream};
 use tokio::time::timeout;
 
-use crate::config::{self, Addr};
+use crate::config::{self, Addr, CongestionController};
 use crate::stream::Stream;
 use crate::{
     cert_from_pem, other, private_key_from_pem, DEFAULT_CONNECT_TIMEOUT,
@@ -27,8 +27,22 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
     transport_config.keep_alive_interval(Some(DEFAULT_KEEP_ALIVE_INTERVAL));
     transport_config
         .max_concurrent_bidi_streams(VarInt::from_u32(DEFAULT_MAX_CONCURRENT_BIDI_STREAMS))
-        .max_idle_timeout(Some(VarInt::from_u32(DEFAULT_MAX_IDLE_TIMEOUT).into()))
-        .congestion_controller_factory(Arc::new(congestion::BbrConfig::default()));
+        .max_idle_timeout(Some(VarInt::from_u32(DEFAULT_MAX_IDLE_TIMEOUT).into()));
+
+    match cfg.congestion_controller {
+        CongestionController::Bbr => {
+            transport_config
+                .congestion_controller_factory(Arc::new(congestion::BbrConfig::default()));
+        }
+        CongestionController::NewReno => {
+            transport_config
+                .congestion_controller_factory(Arc::new(congestion::NewRenoConfig::default()));
+        }
+        CongestionController::Cubic => {
+            transport_config
+                .congestion_controller_factory(Arc::new(congestion::CubicConfig::default()));
+        }
+    }
 
     let mut server_config = ServerConfig::with_single_cert(cert_chain, key)
         .map_err(|e| other(&format!("new server config fail {:?}", e)))?;

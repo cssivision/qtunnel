@@ -14,6 +14,19 @@ pub struct Config {
     pub server: Option<Server>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub enum CongestionController {
+    Bbr,
+    Cubic,
+    NewReno,
+}
+
+impl Default for CongestionController {
+    fn default() -> Self {
+        CongestionController::Bbr
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct Server {
@@ -21,7 +34,7 @@ pub struct Server {
     pub remote_addr: String,
     pub server_cert: String,
     pub server_key: String,
-    pub congestion_controller: String,
+    pub congestion_controller: CongestionController,
 }
 
 impl Server {
@@ -46,7 +59,7 @@ pub struct Client {
     pub remote_addr: String,
     pub domain_name: String,
     pub ca_certificate: String,
-    pub congestion_controller: String,
+    pub congestion_controller: CongestionController,
 }
 
 impl Config {
