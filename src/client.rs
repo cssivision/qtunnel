@@ -7,12 +7,11 @@ use crate::config;
 use crate::connection::Connection;
 
 pub async fn run(cfg: config::Client) -> io::Result<()> {
-    let remote_addr = cfg.remote_addr.parse().expect("invalid remote addr");
     let cert = cert_from_pem(&cfg.ca_certificate)?;
     let conn = Connection::new(
         cert,
         cfg.domain_name,
-        remote_addr,
+        cfg.remote_addr,
         cfg.congestion_controller,
     );
     let listener = TcpListener::bind(&cfg.local_addr).await?;

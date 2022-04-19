@@ -48,14 +48,11 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
         .map_err(|e| other(&format!("new server config fail {:?}", e)))?;
     server_config.transport = Arc::new(transport_config);
 
-    let local_addr = cfg
-        .local_addr
-        .parse()
-        .map_err(|e| other(&format!("parse local addr fail {:?}", e)))?;
+    let local_addr = cfg.local_addr;
     let (endpoint, mut incoming) = Endpoint::server(server_config, local_addr)?;
     log::debug!("listening on {:?}", endpoint.local_addr()?);
 
-    let remote_addrs = cfg.remote_socket_addrs();
+    let remote_addrs = cfg.remote_addrs;
     while let Some(conn) = incoming.next().await {
         log::info!("connection incoming");
         let remote_addrs = remote_addrs.clone();

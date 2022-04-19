@@ -7,7 +7,7 @@ congestion_controller = 'Bbr'
 
 [server]
 local_addr = "127.0.0.1:8091"
-remote_addr = "127.0.0.1:8092"
+remote_addrs = ["127.0.0.1:8092", "temp.sock"]
 server_cert = "./tls_config/mydomain.com.crt"
 server_key = "./tls_config/mydomain.com.key"
 congestion_controller = "Bbr"

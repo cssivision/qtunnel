@@ -7,8 +7,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::other;
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-#[serde(default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub client: Option<Client>,
     pub server: Option<Server>,
@@ -27,38 +26,30 @@ impl Default for CongestionController {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-#[serde(default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Server {
-    pub local_addr: String,
-    pub remote_addr: String,
+    pub local_addr: SocketAddr,
+    pub remote_addrs: Vec<Addr>,
     pub server_cert: String,
     pub server_key: String,
+    #[serde(default)]
     pub congestion_controller: CongestionController,
 }
 
-impl Server {
-    pub fn remote_socket_addrs(&self) -> Vec<Addr> {
-        self.remote_addr
-            .split(',')
-            .map(|v| {
-                if let Ok(addr) = v.parse() {
-                    Addr::Socket(addr)
-                } else {
-                    Addr::Path(Path::new(v).to_path_buf())
-                }
-            })
-            .collect()
-    }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum Addr {
+    Socket(SocketAddr),
+    Path(PathBuf),
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-#[serde(default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Client {
-    pub local_addr: String,
-    pub remote_addr: String,
+    pub local_addr: SocketAddr,
+    pub remote_addr: SocketAddr,
     pub domain_name: String,
     pub ca_certificate: String,
+    #[serde(default)]
     pub congestion_controller: CongestionController,
 }
 
@@ -83,10 +74,4 @@ impl Config {
         }
         Err(other(&format!("{:?} not exist", path.as_ref().to_str())))
     }
-}
-
-#[derive(Clone)]
-pub enum Addr {
-    Socket(SocketAddr),
-    Path(PathBuf),
 }
