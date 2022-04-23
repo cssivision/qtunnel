@@ -369,6 +369,7 @@ dependencies = [
  "futures-util",
  "getopts",
  "log",
+ "pin-project-lite",
  "quinn",
  "rustls",
  "rustls-pemfile",
