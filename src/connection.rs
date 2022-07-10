@@ -108,12 +108,11 @@ impl Connection {
                     Endpoint::client(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0))
                         .map_err(|e| other(&format!("bind fail {:?}", e)))?;
                 endpoint.set_default_client_config(client_config);
-                let new_conn = endpoint
+                endpoint
                     .connect(self.0.addr, &self.0.domain_name)
                     .map_err(|e| other(&format!("connect remote fail {:?}", e)))?
                     .await
-                    .map_err(|e| other(&format!("new connection fail {:?}", e)));
-                new_conn
+                    .map_err(|e| other(&format!("new connection fail {:?}", e)))
             };
 
             match timeout(DEFAULT_CONNECT_TIMEOUT, fut).await {
