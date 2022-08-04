@@ -16,6 +16,7 @@ use crate::{
 };
 
 const DELAY_MS: &[u64] = &[50, 75, 100, 250, 500, 750, 1000];
+const OPEN_BI_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[derive(Clone)]
 pub struct Connection(Arc<Inner>);
@@ -54,17 +55,24 @@ impl Connection {
     }
 
     pub async fn new_stream(&self) -> io::Result<Stream> {
-        let open_bi = self.open_bi().await;
+        let open_bi = timeout(OPEN_BI_TIMEOUT, self.open_bi()).await;
 
-        match open_bi.await {
-            Ok((send_stream, recv_stream)) => Ok(Stream {
-                send_stream,
-                recv_stream,
-            }),
+        match open_bi {
+            Ok(open_bi) => match open_bi.await {
+                Ok((send_stream, recv_stream)) => Ok(Stream {
+                    send_stream,
+                    recv_stream,
+                }),
+                Err(e) => {
+                    log::error!("open bi fail {:?}", e);
+                    let _ = mem::replace(&mut *self.0.new_conn.lock().await, None);
+                    Err(other(&format!("open bi stream fail {:?}", e)))
+                }
+            },
             Err(e) => {
-                log::error!("open bi fail {:?}", e);
+                log::error!("open bi timeout {:?}", e);
                 let _ = mem::replace(&mut *self.0.new_conn.lock().await, None);
-                Err(other(&format!("open bi stream fail {:?}", e)))
+                Err(other(&format!("open bi timeout {:?}", e)))
             }
         }
     }

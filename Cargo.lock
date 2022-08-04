@@ -372,7 +372,7 @@ dependencies = [
  "pin-project-lite",
  "quinn",
  "rustls",
- "rustls-pemfile",
+ "rustls-pemfile 1.0.0",
  "serde",
  "serde_derive",
  "tokio",
@@ -410,7 +410,7 @@ dependencies = [
  "ring",
  "rustls",
  "rustls-native-certs",
- "rustls-pemfile",
+ "rustls-pemfile 0.2.1",
  "slab",
  "thiserror",
  "tinyvec",
@@ -532,7 +532,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ca9ebdfa27d3fc180e42879037b5338ab1c040c06affd00d8338598e7800943"
 dependencies = [
  "openssl-probe",
- "rustls-pemfile",
+ "rustls-pemfile 0.2.1",
  "schannel",
  "security-framework",
 ]
@@ -542,6 +542,15 @@ name = "rustls-pemfile"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5eebeaeb360c87bfb72e84abdb3447159c0eaececf1bef2aecd65a8be949d1c9"
+dependencies = [
+ "base64",
+]
+
+[[package]]
+name = "rustls-pemfile"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7522c9de787ff061458fe9a829dc790a3f5b22dc571694fc5883f448b94d9a9"
 dependencies = [
  "base64",
 ]
