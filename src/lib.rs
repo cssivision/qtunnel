@@ -69,17 +69,17 @@ where
         Ok(v) => match v {
             Ok((n1, n2)) => {
                 log::debug!("proxy local => remote: {}, remote => local: {}", n1, n2);
-                return;
             }
             Err(e) => {
+                stream.reset();
                 log::error!("copy_bidirectional err: {:?}", e);
             }
         },
         Err(_) => {
+            stream.reset();
             log::error!("copy_bidirectional idle timeout");
         }
     }
-    stream.reset();
 }
 
 pin_project! {
