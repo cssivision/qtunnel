@@ -55,10 +55,10 @@ impl Connection {
     }
 
     pub async fn new_stream(&self) -> io::Result<Stream> {
-        let open_bi = timeout(OPEN_BI_TIMEOUT, self.open_bi()).await;
+        let open_bi = self.open_bi().await;
 
-        match open_bi {
-            Ok(open_bi) => match open_bi.await {
+        match timeout(OPEN_BI_TIMEOUT, open_bi).await {
+            Ok(open_bi) => match open_bi {
                 Ok((send_stream, recv_stream)) => Ok(Stream {
                     send_stream,
                     recv_stream,
