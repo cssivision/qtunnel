@@ -13,7 +13,7 @@ pub async fn run(cfg: config::Client) -> io::Result<()> {
         cfg.domain_name,
         cfg.remote_addr,
         cfg.congestion_controller,
-    );
+    )?;
     let listener = TcpListener::bind(&cfg.local_addr).await?;
     log::debug!("listening on {:?}", listener.local_addr()?);
     loop {

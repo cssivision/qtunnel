@@ -22,11 +22,10 @@ const OPEN_BI_TIMEOUT: Duration = Duration::from_secs(3);
 pub struct Connection(Arc<Inner>);
 
 struct Inner {
-    cert: rustls::Certificate,
     addr: SocketAddr,
     domain_name: String,
     new_conn: Mutex<Option<NewConnection>>,
-    congestion_controller: CongestionController,
+    client_config: ClientConfig,
 }
 
 impl Connection {
@@ -35,14 +34,38 @@ impl Connection {
         domain_name: String,
         addr: SocketAddr,
         cc: CongestionController,
-    ) -> Connection {
-        Connection(Arc::new(Inner {
+    ) -> io::Result<Connection> {
+        let mut certs = rustls::RootCertStore::empty();
+        certs
+            .add(&cert)
+            .map_err(|e| other(&format!("add cert fail {:?}", e)))?;
+        let mut client_config = ClientConfig::with_root_certificates(certs);
+        let mut transport_config = TransportConfig::default();
+        transport_config.keep_alive_interval(Some(DEFAULT_KEEP_ALIVE_INTERVAL));
+        transport_config
+            .max_concurrent_bidi_streams(VarInt::from_u32(DEFAULT_MAX_CONCURRENT_BIDI_STREAMS))
+            .max_idle_timeout(Some(VarInt::from_u32(DEFAULT_MAX_IDLE_TIMEOUT).into()));
+        match cc {
+            CongestionController::Bbr => {
+                transport_config
+                    .congestion_controller_factory(Arc::new(congestion::BbrConfig::default()));
+            }
+            CongestionController::NewReno => {
+                transport_config
+                    .congestion_controller_factory(Arc::new(congestion::NewRenoConfig::default()));
+            }
+            CongestionController::Cubic => {
+                transport_config
+                    .congestion_controller_factory(Arc::new(congestion::CubicConfig::default()));
+            }
+        }
+        client_config.transport = Arc::new(transport_config);
+        Ok(Connection(Arc::new(Inner {
             addr,
             domain_name,
-            cert,
             new_conn: Mutex::new(None),
-            congestion_controller: cc,
-        }))
+            client_config,
+        })))
     }
 
     async fn open_bi(&self) -> OpenBi {
@@ -81,41 +104,10 @@ impl Connection {
         let mut sleeps = 0;
         loop {
             let fut = async move {
-                let mut certs = rustls::RootCertStore::empty();
-                certs
-                    .add(&self.0.cert)
-                    .map_err(|e| other(&format!("add cert fail {:?}", e)))?;
-                let mut client_config = ClientConfig::with_root_certificates(certs);
-                let mut transport_config = TransportConfig::default();
-                transport_config.keep_alive_interval(Some(DEFAULT_KEEP_ALIVE_INTERVAL));
-                transport_config
-                    .max_concurrent_bidi_streams(VarInt::from_u32(
-                        DEFAULT_MAX_CONCURRENT_BIDI_STREAMS,
-                    ))
-                    .max_idle_timeout(Some(VarInt::from_u32(DEFAULT_MAX_IDLE_TIMEOUT).into()));
-
-                match self.0.congestion_controller {
-                    CongestionController::Bbr => {
-                        transport_config.congestion_controller_factory(Arc::new(
-                            congestion::BbrConfig::default(),
-                        ));
-                    }
-                    CongestionController::NewReno => {
-                        transport_config.congestion_controller_factory(Arc::new(
-                            congestion::NewRenoConfig::default(),
-                        ));
-                    }
-                    CongestionController::Cubic => {
-                        transport_config.congestion_controller_factory(Arc::new(
-                            congestion::CubicConfig::default(),
-                        ));
-                    }
-                }
-                client_config.transport = Arc::new(transport_config);
                 let mut endpoint =
                     Endpoint::client(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0))
                         .map_err(|e| other(&format!("bind fail {:?}", e)))?;
-                endpoint.set_default_client_config(client_config);
+                endpoint.set_default_client_config(self.0.client_config.clone());
                 endpoint
                     .connect(self.0.addr, &self.0.domain_name)
                     .map_err(|e| other(&format!("connect remote fail {:?}", e)))?
