@@ -4,7 +4,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
-use quinn::{congestion, ClientConfig, Endpoint, NewConnection, OpenBi, TransportConfig, VarInt};
+use quinn::{congestion, ClientConfig, Endpoint, TransportConfig, VarInt};
 use tokio::sync::Mutex;
 use tokio::time::{sleep, timeout};
 
@@ -24,7 +24,7 @@ pub struct Connection(Arc<Inner>);
 struct Inner {
     addr: SocketAddr,
     domain_name: String,
-    new_conn: Mutex<Option<NewConnection>>,
+    conn: Mutex<Option<quinn::Connection>>,
     client_config: ClientConfig,
 }
 
@@ -59,26 +59,22 @@ impl Connection {
                     .congestion_controller_factory(Arc::new(congestion::CubicConfig::default()));
             }
         }
-        client_config.transport = Arc::new(transport_config);
+        client_config.transport_config(Arc::new(transport_config));
         Ok(Connection(Arc::new(Inner {
             addr,
             domain_name,
-            new_conn: Mutex::new(None),
+            conn: Mutex::new(None),
             client_config,
         })))
     }
 
-    async fn open_bi(&self) -> OpenBi {
-        let mut lock = self.0.new_conn.lock().await;
+    pub async fn new_stream(&self) -> io::Result<Stream> {
+        let mut lock = self.0.conn.lock().await;
         if lock.is_none() {
             let new_conn = self.connect().await;
             let _ = mem::replace(&mut *lock, Some(new_conn));
         }
-        lock.as_ref().unwrap().connection.open_bi()
-    }
-
-    pub async fn new_stream(&self) -> io::Result<Stream> {
-        let open_bi = self.open_bi().await;
+        let open_bi = lock.as_ref().unwrap().open_bi();
 
         match timeout(OPEN_BI_TIMEOUT, open_bi).await {
             Ok(open_bi) => match open_bi {
@@ -88,19 +84,19 @@ impl Connection {
                 }),
                 Err(e) => {
                     log::error!("open bi fail {:?}", e);
-                    let _ = mem::replace(&mut *self.0.new_conn.lock().await, None);
+                    let _ = mem::replace(&mut *self.0.conn.lock().await, None);
                     Err(other(&format!("open bi stream fail {:?}", e)))
                 }
             },
             Err(e) => {
                 log::error!("open bi timeout {:?}", e);
-                let _ = mem::replace(&mut *self.0.new_conn.lock().await, None);
+                let _ = mem::replace(&mut *self.0.conn.lock().await, None);
                 Err(other(&format!("open bi timeout {:?}", e)))
             }
         }
     }
 
-    async fn connect(&self) -> NewConnection {
+    async fn connect(&self) -> quinn::Connection {
         let mut sleeps = 0;
         loop {
             let fut = async move {

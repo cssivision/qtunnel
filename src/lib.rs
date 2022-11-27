@@ -42,8 +42,7 @@ pub fn private_key_from_pem(server_key: &str) -> io::Result<PrivateKey> {
 }
 
 pub fn cert_from_pem(cert_path: &str) -> io::Result<Certificate> {
-    let cert =
-        fs::read(&cert_path).map_err(|e| other(&format!("read server cert fail {:?}", e)))?;
+    let cert = fs::read(cert_path).map_err(|e| other(&format!("read server cert fail {:?}", e)))?;
     let certs = rustls_pemfile::certs(&mut &cert[..])
         .map_err(|e| other(&format!("extract cert fail {:?}", e)))?;
     if let Some(pem) = certs.into_iter().next() {

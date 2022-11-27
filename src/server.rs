@@ -3,10 +3,8 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use futures_util::StreamExt;
 use quinn::{
-    congestion, Connecting, ConnectionError, Endpoint, NewConnection, ServerConfig,
-    TransportConfig, VarInt,
+    congestion, Connecting, ConnectionError, Endpoint, ServerConfig, TransportConfig, VarInt,
 };
 use tokio::net::{TcpStream, UnixStream};
 use tokio::time::timeout;
@@ -49,11 +47,11 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
     server_config.transport = Arc::new(transport_config);
 
     let local_addr = cfg.local_addr;
-    let (endpoint, mut incoming) = Endpoint::server(server_config, local_addr)?;
+    let endpoint = Endpoint::server(server_config, local_addr)?;
     log::debug!("listening on {:?}", endpoint.local_addr()?);
 
     let remote_addrs = cfg.remote_addrs;
-    while let Some(conn) = incoming.next().await {
+    while let Some(conn) = endpoint.accept().await {
         log::info!("connection incoming");
         let remote_addrs = remote_addrs.clone();
         tokio::spawn(async move {
@@ -66,7 +64,7 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
 }
 
 async fn proxy(conn: Connecting, addrs: Vec<Addr>) -> io::Result<()> {
-    let NewConnection { mut bi_streams, .. } = conn
+    let connection = conn
         .await
         .map_err(|e| other(&format!("new connection fail {:?}", e)))?;
     log::debug!("established");
@@ -74,7 +72,8 @@ async fn proxy(conn: Connecting, addrs: Vec<Addr>) -> io::Result<()> {
     let mut next: usize = 0;
 
     // Each stream initiated by the client constitutes a new request.
-    while let Some(stream) = bi_streams.next().await {
+    loop {
+        let stream = connection.accept_bi().await;
         match stream {
             Err(ConnectionError::ApplicationClosed { .. }) => {
                 return Err(other("connection closed"));
@@ -100,7 +99,6 @@ async fn proxy(conn: Connecting, addrs: Vec<Addr>) -> io::Result<()> {
             }
         };
     }
-    Ok(())
 }
 
 async fn proxy_unix(mut stream: Stream, addr: PathBuf) {
