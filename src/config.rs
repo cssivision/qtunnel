@@ -13,17 +13,12 @@ pub struct Config {
     pub server: Option<Server>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub enum CongestionController {
+    #[default]
     Bbr,
     Cubic,
     NewReno,
-}
-
-impl Default for CongestionController {
-    fn default() -> Self {
-        CongestionController::Bbr
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

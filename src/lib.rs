@@ -27,14 +27,14 @@ const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const DEFAULT_VISITED_GAP: Duration = Duration::from_secs(3);
 
 pub fn private_key_from_pem(server_key: &str) -> io::Result<PrivateKey> {
-    let pem = fs::read(server_key).map_err(|e| other(&format!("read server key fail {:?}", e)))?;
+    let pem = fs::read(server_key).map_err(|e| other(&format!("read server key fail {e:?}")))?;
     let pkcs8 = rustls_pemfile::pkcs8_private_keys(&mut &pem[..])
-        .map_err(|e| other(&format!("malformed PKCS #8 private key {:?}", e)))?;
+        .map_err(|e| other(&format!("malformed PKCS #8 private key {e:?}")))?;
     if let Some(x) = pkcs8.into_iter().next() {
         return Ok(PrivateKey(x));
     }
     let rsa = rustls_pemfile::rsa_private_keys(&mut &pem[..])
-        .map_err(|e| other(&format!("malformed PKCS #1 private key {:?}", e)))?;
+        .map_err(|e| other(&format!("malformed PKCS #1 private key {e:?}")))?;
     if let Some(x) = rsa.into_iter().next() {
         return Ok(PrivateKey(x));
     }
@@ -42,9 +42,9 @@ pub fn private_key_from_pem(server_key: &str) -> io::Result<PrivateKey> {
 }
 
 pub fn cert_from_pem(cert_path: &str) -> io::Result<Certificate> {
-    let cert = fs::read(cert_path).map_err(|e| other(&format!("read server cert fail {:?}", e)))?;
+    let cert = fs::read(cert_path).map_err(|e| other(&format!("read server cert fail {e:?}")))?;
     let certs = rustls_pemfile::certs(&mut &cert[..])
-        .map_err(|e| other(&format!("extract cert fail {:?}", e)))?;
+        .map_err(|e| other(&format!("extract cert fail {e:?}")))?;
     if let Some(pem) = certs.into_iter().next() {
         return Ok(Certificate(pem));
     }

@@ -43,7 +43,7 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
     }
 
     let mut server_config = ServerConfig::with_single_cert(cert_chain, key)
-        .map_err(|e| other(&format!("new server config fail {:?}", e)))?;
+        .map_err(|e| other(&format!("new server config fail {e:?}")))?;
     server_config.transport = Arc::new(transport_config);
 
     let local_addr = cfg.local_addr;
@@ -66,7 +66,7 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
 async fn proxy(conn: Connecting, addrs: Vec<Addr>) -> io::Result<()> {
     let connection = conn
         .await
-        .map_err(|e| other(&format!("new connection fail {:?}", e)))?;
+        .map_err(|e| other(&format!("new connection fail {e:?}")))?;
     log::debug!("established");
 
     let mut next: usize = 0;
@@ -79,7 +79,7 @@ async fn proxy(conn: Connecting, addrs: Vec<Addr>) -> io::Result<()> {
                 return Err(other("connection closed"));
             }
             Err(e) => {
-                return Err(other(&format!("connection err: {:?}", e)));
+                return Err(other(&format!("connection err: {e:?}")));
             }
             Ok((send_stream, recv_stream)) => {
                 log::debug!("new stream incoming {}", send_stream.id());
